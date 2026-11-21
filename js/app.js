@@ -54,7 +54,7 @@ const byName = (a, b) => str(a.name, 40).localeCompare(str(b.name, 40), "pt-BR")
 function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* navegador sem armazenamento */ } }
 function read(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
-const AV_BG = ["linear-gradient(140deg,#2a8a63,#0f3a2b)", "linear-gradient(140deg,#d2475b,#6e1424)", "linear-gradient(140deg,#d9a441,#7d5410)", "linear-gradient(140deg,#4f86a8,#1b3446)"];
+const AV_BG = ["#2c8c58", "#e0453a", "#e49a1c", "#3f86c6", "#b0458a"];
 function avatar(p, size) {
   const name = str(p && p.name, 40) || "?";
   const ph = safePhoto(p && p.photo);
@@ -780,10 +780,11 @@ function startSnow() {
   function size() { w = innerWidth; h = innerHeight; c.width = w; c.height = h; }
   size(); addEventListener("resize", size);
   const N = Math.round(Math.min(70, Math.max(30, (w * h) / 12000)));
-  for (let i = 0; i < N; i++) flakes.push({ x: Math.random() * w, y: Math.random() * h, r: 0.6 + Math.random() * 2.1, s: 0.25 + Math.random() * 0.75, a: Math.random() * 6.28, o: 0.25 + Math.random() * 0.55 });
+  for (let i = 0; i < N; i++) flakes.push({ x: Math.random() * w, y: Math.random() * h, r: 0.6 + Math.random() * 2.1, s: 0.25 + Math.random() * 0.75, a: Math.random() * 6.28, o: 0.35 + Math.random() * 0.45, c: Math.random() < 0.8 ? "#9cc7ea" : "#bfdcf2" });
   function draw() {
-    ctx.clearRect(0, 0, w, h); ctx.fillStyle = "#fff";
-    for (const f of flakes) { ctx.globalAlpha = f.o; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill(); }
+    // Fundo claro: flocos azul-gelo (branco sumiria no papel).
+    ctx.clearRect(0, 0, w, h);
+    for (const f of flakes) { ctx.fillStyle = f.c; ctx.globalAlpha = f.o; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill(); }
   }
   if (REDUCE) { draw(); return; }
   let lastT = 0;
@@ -807,7 +808,7 @@ function buildLights() {
   const svg = $("#lights"), ns = "http://www.w3.org/2000/svg";
   const path = document.createElementNS(ns, "path");
   path.setAttribute("d", "M-6 4 C 50 40, 120 42, 180 20 S 300 -2, 366 22"); path.setAttribute("class", "wire"); svg.appendChild(path);
-  const L = path.getTotalLength(), cols = ["#f3c76a", "#e4475b", "#86dcaa", "#fff1cf"], N = 15;
+  const L = path.getTotalLength(), cols = ["#f2b33d", "#e0453a", "#2c8c58", "#3f86c6"], N = 15;
   // Brilho como gradiente parado (filtro drop-shadow animado repintava as luzes a cada quadro).
   const defs = document.createElementNS(ns, "defs");
   cols.forEach((c, i) => {
