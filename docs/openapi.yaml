@@ -1,0 +1,361 @@
+openapi: 3.0.3
+info:
+  title: Amigo Secreto de Natal — API
+  version: 1.0.0
+  description: |
+    Backend do site estático em `index.html`. Um grupo por instalação.
+    Ninguém precisa de conta: cada participante recebe um **token pessoal** (vai no link `#t=...`)
+    e o organizador usa uma **chave de organizador** (vai no link `#admin=...`).
+    O sorteio acontece no servidor; nenhuma rota devolve os pares para o organizador.
+servers:
+  - url: http://localhost:8080/api
+    description: Desenvolvimento local
+tags:
+  - name: Público
+  - name: Participante
+  - name: Organizador
+
+components:
+  securitySchemes:
+    participantToken:
+      type: http
+      scheme: bearer
+      description: "Token pessoal devolvido no cadastro. O frontend envia `Authorization: Bearer <token>`."
+    adminKey:
+      type: apiKey
+      in: header
+      name: X-Admin-Key
+      description: Chave do organizador, definida por variável de ambiente no servidor.
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [invalid, unauthorized, forbidden, not_found, conflict, too_large, server]
+        message:
+          type: string
+          description: Texto em português; o frontend mostra para a pessoa em erros `invalid` e `conflict`.
+          example: O sorteio precisa de pelo menos 3 pessoas.
+
+    Features:
+      type: object
+      properties:
+        aiIdeas:
+          type: boolean
+          description: Liga o botão "Pedir ideias com IA" (rota POST /me/ideas).
+
+    Config:
+      type: object
+      required: [title, status]
+      properties:
+        title: { type: string, maxLength: 50, example: Natal da Família 2026 }
+        drawDate: { type: string, description: "AAAA-MM-DD ou vazio", example: "2026-12-20" }
+        exchangeDate: { type: string, description: "AAAA-MM-DD ou vazio", example: "2026-12-24" }
+        budget: { type: integer, nullable: true, minimum: 0, description: Valor sugerido em reais, example: 100 }
+        status: { type: string, enum: [open, drawn] }
+        drawnAt: { type: integer, format: int64, nullable: true, description: Epoch em milissegundos }
+        drawCount: { type: integer, description: Quantas pessoas entraram no último sorteio }
+        features: { $ref: "#/components/schemas/Features" }
+
+    ConfigUpdate:
+      type: object
+      properties:
+        title: { type: string, maxLength: 50 }
+        drawDate: { type: string }
+        exchangeDate: { type: string }
+        budget: { type: integer, nullable: true, minimum: 0 }
+
+    ParticipantInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+        photo:
+          type: string
+          nullable: true
+          description: "Data URL JPEG/PNG/WebP, 360x360 gerada pelo frontend. Recuse acima de ~200 KB."
+          example: "data:image/jpeg;base64,/9j/4AAQ..."
+        shoe: { type: string, maxLength: 16, example: "38" }
+        pants: { type: string, maxLength: 16, example: "42" }
+        shirt: { type: string, maxLength: 16, example: "M" }
+        likes: { type: string, maxLength: 300 }
+        wishlist: { type: string, maxLength: 500, description: Um item por linha }
+        avoid: { type: string, maxLength: 160 }
+
+    Participant:
+      allOf:
+        - $ref: "#/components/schemas/ParticipantInput"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, example: p_8f2k1x0a9q }
+            manual: { type: boolean, description: true quando o organizador cadastrou }
+            createdAt: { type: integer, format: int64 }
+            updatedAt: { type: integer, format: int64 }
+
+    AdminParticipant:
+      allOf:
+        - $ref: "#/components/schemas/Participant"
+        - type: object
+          properties:
+            complete: { type: boolean }
+            inDraw: { type: boolean, description: Entrou no sorteio atual }
+
+    PublicParticipant:
+      type: object
+      description: O que todo mundo vê na aba Pessoas. Sem tamanhos.
+      required: [id, name, complete]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        photo: { type: string, nullable: true }
+        complete: { type: boolean, description: Tem calçado, calça e camisa preenchidos }
+
+    Receiver:
+      type: object
+      description: Quem eu tirei. Mesmos campos do cadastro, sem metadados.
+      properties:
+        id: { type: string }
+        name: { type: string }
+        photo: { type: string, nullable: true }
+        shoe: { type: string }
+        pants: { type: string }
+        shirt: { type: string }
+        likes: { type: string }
+        wishlist: { type: string }
+        avoid: { type: string }
+
+    Assignment:
+      type: object
+      required: [receiver]
+      properties:
+        receiver:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Receiver" }]
+        reason:
+          type: string
+          nullable: true
+          enum: [not_drawn, joined_after_draw, receiver_left, null]
+
+    TokenResponse:
+      type: object
+      required: [participant, token]
+      properties:
+        participant: { $ref: "#/components/schemas/Participant" }
+        token: { type: string, description: Mostrado uma única vez. Guarde só o hash no banco. }
+
+    Idea:
+      type: object
+      required: [titulo]
+      properties:
+        titulo: { type: string, example: Pantufa de lã número 38 }
+        porque: { type: string, example: Gosta de ficar em casa nas férias }
+        preco: { type: string, example: R$ 60–90 }
+
+  responses:
+    Unauthorized:
+      description: Token ou chave ausente ou inválido
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Não encontrado
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Invalid:
+      description: Dados inválidos
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: Ação não permitida no estado atual
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+paths:
+  /config:
+    get:
+      tags: [Público]
+      summary: Configuração e estado do sorteio
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Config" } } } }
+
+  /participants:
+    get:
+      tags: [Público]
+      summary: Lista pública de participantes (sem tamanhos)
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PublicParticipant" } } } }
+    post:
+      tags: [Público]
+      summary: Cadastro de uma pessoa pelo próprio celular
+      description: Devolve o token pessoal. Recuse com 409 quando o status for `drawn`.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantInput" } } }
+      responses:
+        "201": { description: Criado, content: { application/json: { schema: { $ref: "#/components/schemas/TokenResponse" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { description: Foto grande demais }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  /me:
+    get:
+      tags: [Participante]
+      security: [{ participantToken: [] }]
+      summary: Meu cadastro
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Participant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [Participante]
+      security: [{ participantToken: [] }]
+      summary: Atualizar meu cadastro (substitui todos os campos)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantInput" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Participant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/Invalid" }
+    delete:
+      tags: [Participante]
+      security: [{ participantToken: [] }]
+      summary: Sair do sorteio
+      description: Recuse com 409 quando o status for `drawn`.
+      responses:
+        "204": { description: Removido }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /me/assignment:
+    get:
+      tags: [Participante]
+      security: [{ participantToken: [] }]
+      summary: Quem eu tirei
+      description: |
+        `receiver` preenchido só quando o status é `drawn`, a pessoa entrou no sorteio e quem ela tirou ainda existe.
+        Caso contrário, `receiver: null` com o motivo em `reason`.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Assignment" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/ideas:
+    post:
+      tags: [Participante]
+      security: [{ participantToken: [] }]
+      summary: Ideias de presente com IA para quem eu tirei (opcional)
+      description: Só é chamada quando `features.aiIdeas` é true. Use o perfil de quem a pessoa tirou e o valor sugerido.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ideas: { type: array, maxItems: 6, items: { $ref: "#/components/schemas/Idea" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/check:
+    get:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Confere a chave de organizador
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/config:
+    put:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Atualizar nome do grupo, datas e valor
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ConfigUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Config" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/participants:
+    get:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Todos os cadastros completos
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AdminParticipant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: "Cadastrar alguém (por exemplo, quem tem dificuldade com o celular)"
+      description: Grava `manual = true` e devolve o token pessoal para o organizador mandar pelo WhatsApp.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantInput" } } }
+      responses:
+        "201": { description: Criado, content: { application/json: { schema: { $ref: "#/components/schemas/TokenResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/Invalid" }
+
+  /admin/participants/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Editar um cadastro
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantInput" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Participant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Remover um cadastro
+      responses:
+        "204": { description: Removido }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/participants/{id}/link:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Gerar novo link pessoal
+      description: Troca o token da pessoa; o anterior para de funcionar.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/draw:
+    post:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Fazer (ou refazer) o sorteio
+      description: |
+        Usa todos os cadastros atuais. Mínimo de 3 pessoas (409 abaixo disso).
+        Apaga os pares anteriores, grava os novos, `status = drawn`, `drawnAt = agora`.
+        A resposta NÃO inclui os pares.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Config" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/reopen:
+    post:
+      tags: [Organizador]
+      security: [{ adminKey: [] }]
+      summary: Reabrir inscrições
+      description: Apaga os pares e volta `status` para `open`.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Config" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }

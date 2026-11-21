@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06130e">
+<meta name="description" content="Amigo secreto de Natal da família: cadastro com foto e tamanhos, sorteio e ideias de presente.">
+<title>Amigo Secreto de Natal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='26' width='44' height='30' rx='6' fill='%23c52f46'/%3E%3Crect x='6' y='18' width='52' height='12' rx='5' fill='%23f0606f'/%3E%3Crect x='28' y='18' width='8' height='38' fill='%23f3c76a'/%3E%3Cpath d='M32 18C24 6 14 8 18 16c2 3 8 3 14 2zM32 18c8-12 18-10 14-2-2 3-8 3-14 2z' fill='%23f3c76a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script src="js/config.js"></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<div class="sky" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><i class="d d4"></i></div>
+<canvas id="snow" aria-hidden="true"></canvas>
+
+<main class="app" id="app">
+  <header class="hero">
+    <svg class="lights" id="lights" viewBox="0 0 360 46" aria-hidden="true"></svg>
+    <div class="eyebrow" id="heroEyebrow">Natal 2026</div>
+    <h1>Amigo <em>Secreto</em></h1>
+    <p class="lede" id="heroLede">Cadastre sua foto e seus tamanhos. No dia do sorteio, você descobre aqui quem tirou.</p>
+  </header>
+
+  <div class="notice" id="notice" role="status"></div>
+
+  <section class="view on" data-view="inicio" id="view-inicio">
+    <div id="homeStatus"></div>
+    <div id="homeMine"></div>
+    <div id="homeHow"></div>
+  </section>
+
+  <section class="view" data-view="cadastro" id="view-cadastro">
+    <div>
+      <div class="eyebrow">Seus dados</div>
+      <h2 class="sec-title" id="cadTitle">Entrar no sorteio</h2>
+      <p class="sec-sub">É isso que o seu amigo secreto vai ver.</p>
+    </div>
+    <div id="cadMsg"></div>
+    <div class="glass card" id="myFormWrap"></div>
+    <div id="cadLink"></div>
+    <button class="btn btn-text" type="button" data-act="leave" id="cadLeave" hidden>Sair do sorteio</button>
+  </section>
+
+  <section class="view" data-view="pessoas" id="view-pessoas">
+    <div>
+      <div class="eyebrow" id="pplCount">No sorteio</div>
+      <h2 class="sec-title">Quem vai participar</h2>
+    </div>
+    <div id="pplGrid"></div>
+  </section>
+
+  <section class="view" data-view="admin" id="view-admin">
+    <div>
+      <div class="eyebrow">Só o organizador vê esta aba</div>
+      <h2 class="sec-title">Organizar</h2>
+    </div>
+    <div id="admDraw"></div>
+    <div class="glass card">
+      <h2 class="card-title">Ajustes</h2>
+      <form class="form" id="cfgForm" novalidate style="margin-top:16px">
+        <div><label class="field-label" for="cfg-title">Nome do grupo</label><input class="input" id="cfg-title" maxlength="50" placeholder="Natal da Família"></div>
+        <div class="row2">
+          <div><label class="field-label" for="cfg-draw">Dia do sorteio</label><input class="input" type="date" id="cfg-draw"></div>
+          <div><label class="field-label" for="cfg-ex">Troca de presentes</label><input class="input" type="date" id="cfg-ex"></div>
+        </div>
+        <div><label class="field-label" for="cfg-budget">Valor sugerido (R$)</label><input class="input" type="number" inputmode="numeric" min="0" step="10" id="cfg-budget" placeholder="100"></div>
+        <div><button class="btn btn-gold btn-block" type="submit" id="cfg-save">Salvar ajustes</button><p class="form-status" id="cfg-status" role="status"></p></div>
+      </form>
+    </div>
+    <div id="admPeople"></div>
+  </section>
+</main>
+
+<nav class="tabbar glass" id="tabbar" role="tablist" aria-label="Seções">
+  <span class="tab-ind" id="tabInd"></span>
+  <button class="tab" role="tab" data-tab="inicio" id="tab-inicio" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8"/><rect x="2.5" y="7.5" width="19" height="4.5" rx="1"/><path d="M12 21V7.5"/><path d="M12 7.5S10.6 3 8 3a2.25 2.25 0 0 0 0 4.5M12 7.5S13.4 3 16 3a2.25 2.25 0 0 1 0 4.5"/></svg>Início</button>
+  <button class="tab" role="tab" data-tab="cadastro" id="tab-cadastro" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></svg>Cadastro</button>
+  <button class="tab" role="tab" data-tab="pessoas" id="tab-pessoas" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20c.9-3.3 3.4-5 6.5-5s5.6 1.7 6.5 5"/><circle cx="17" cy="7.5" r="2.8"/><path d="M16.5 13.2c2.6.1 4.3 1.6 5 4.3"/></svg>Pessoas</button>
+  <button class="tab" role="tab" data-tab="admin" id="tab-admin" aria-selected="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.8l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.7l-5.4 2.9 1.1-6.1-4.5-4.3 6.1-.8z"/></svg>Organizar</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Detalhes" aria-hidden="true">
+  <div class="grabber"></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<div class="scrim" id="dlgScrim"></div>
+<div class="dialog glass" id="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <h2 id="dlgTitle">Confirmar</h2>
+  <p id="dlgBody"></p>
+  <div class="btn-row"><button class="btn btn-glass" id="dlgCancel" type="button">Cancelar</button><button class="btn btn-gold" id="dlgOk" type="button">Confirmar</button></div>
+</div>
+
+<div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:24px;color:#fff">Ative o JavaScript para usar o Amigo Secreto.</p></noscript>
+</body>
+</html>
