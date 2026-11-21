@@ -103,6 +103,7 @@ components:
           properties:
             complete: { type: boolean }
             inDraw: { type: boolean, description: Entrou no sorteio atual }
+            token: { type: string, nullable: true, description: "Link pessoal (#t=...) para o organizador reenviar. Nulo em cadastros antigos." }
 
     PublicParticipant:
       type: object

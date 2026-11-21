@@ -25,6 +25,7 @@ const S = {
   asg: null,             // {receiver, reason}
   loading: true, offline: false,
   view: "inicio", revealed: false, opening: false,
+  autoOpen: false,       // chegou pelo link pessoal: abre o presente sozinho
   ai: { status: "idle", items: [], msg: "" },
   busy: false, sheetOpen: false, dlgDone: null,
 };
@@ -35,7 +36,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const str = (v, max) => (typeof v === "string" ? v : v == null ? "" : String(v)).slice(0, max);
 const safePhoto = (p) => (typeof p === "string" && p.length < 280000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p) ? p : null);
-const first = (n) => str(n, 40).trim().split(/\s+/)[0] || "essa pessoa";
+const TITLES = /^(dona|d\.|seu|sr\.?|sra\.?|tio|tia|vó|vô|vovó|vovô|avó|avô|dr\.?|dra\.?)$/i;
+// Primeiro nome; com título junto ("Dona Célia", "Tio Beto") mantém os dois.
+const first = (n) => { const w = str(n, 40).trim().split(/\s+/).filter(Boolean); return (w.length > 1 && TITLES.test(w[0]) ? `${w[0]} ${w[1]}` : w[0]) || "essa pessoa"; };
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const fmtLong = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 const fmtDM = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -78,7 +81,9 @@ function errorCopy(e) {
 
 function personalLink(token) { return `${location.origin}${location.pathname}#t=${encodeURIComponent(token)}`; }
 function waHref(token, name) {
-  const msg = `Oi, ${first(name)}! Este é o seu link do Amigo Secreto de Natal. Guarde: é por ele que você entra e vê quem tirou.\n${personalLink(token)}`;
+  const msg = S.config.status === "drawn"
+    ? `Oi, ${first(name)}! O sorteio do Amigo Secreto de Natal já foi feito. Toque no link para ver quem você tirou e as ideias de presente:\n${personalLink(token)}`
+    : `Oi, ${first(name)}! Este é o seu link do Amigo Secreto de Natal. Guarde: é por ele que você entra e, no dia do sorteio, vê quem tirou.\n${personalLink(token)}`;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 async function copyText(text) {
@@ -119,6 +124,16 @@ async function refresh() {
   }
   S.loading = false;
   fillMyForm(); fillConfigForm(); render();
+  autoOpenGift();
+}
+
+/** Quem chega pelo link pessoal depois do sorteio já vê quem tirou, sem precisar tocar no presente. */
+function autoOpenGift() {
+  if (!S.autoOpen || !S.token) return;
+  if (S.me) S.autoOpen = false;
+  if (S.revealed || !myReceiver()) return;
+  go("inicio");
+  setTimeout(openGift, REDUCE ? 0 : 700);
 }
 
 /* ================= formulário de pessoa ================= */
@@ -264,7 +279,7 @@ function ask({ title, body, ok = "Confirmar", cancel = "Cancelar", danger = fals
   });
 }
 
-function linkBoxHTML(token, name, { title = "Seu link pessoal", text = "Abra o app por ele em outro celular. Não passe para ninguém." } = {}) {
+function linkBoxHTML(token, name, { title = "Seu link pessoal", text = "Abra o app por ele em outro celular. Não passe para ninguém.", resetId = null } = {}) {
   return `<div class="linkbox inset">
     <div><b>${esc(title)}</b><span>${esc(text)}</span></div>
     <div class="link-url">${esc(personalLink(token))}</div>
@@ -272,6 +287,7 @@ function linkBoxHTML(token, name, { title = "Seu link pessoal", text = "Abra o a
       <button class="btn btn-glass btn-sm" type="button" data-act="copy-link" data-v="${esc(token)}">${ICON.link} Copiar link</button>
       <a class="btn btn-glass btn-sm" href="${esc(waHref(token, name))}" target="_blank" rel="noopener">${ICON.chat} WhatsApp</a>
     </div>
+    ${resetId ? `<button class="btn btn-text btn-sm" type="button" data-act="new-link" data-v="${esc(resetId)}">Trocar link (o atual para de funcionar)</button>` : ""}
   </div>`;
 }
 
@@ -286,7 +302,7 @@ function renderHero() {
   $("#heroEyebrow").textContent = str(S.config.title, 50) || DEF.title;
   const r = myReceiver();
   $("#heroLede").textContent = S.config.status === "drawn"
-    ? (r ? "O sorteio foi feito. Abra o presente para ver quem você tirou." : "O sorteio foi feito. Cada pessoa vê aqui só quem tirou.")
+    ? (r ? (S.revealed ? "Este é o seu amigo secreto. Guarde segredo até a troca!" : "O sorteio foi feito. Abra o presente para ver quem você tirou.") : "O sorteio foi feito. Cada pessoa vê aqui só quem tirou.")
     : "Cadastre sua foto e seus tamanhos. No dia do sorteio, você descobre aqui quem tirou.";
 }
 
@@ -459,7 +475,8 @@ function admDrawHTML() {
     if (late) warn += `<p class="warn">${late} ${late === 1 ? "pessoa entrou" : "pessoas entraram"} depois do sorteio e ainda não tem par.</p>`;
     return `<div class="glass card stack-col">
       <div><div class="eyebrow ok">Sorteio feito</div><h2 class="card-title">${Number(c.drawCount) || inDraw} pessoas sorteadas</h2>
-      <p class="muted" style="margin-top:8px">${c.drawnAt ? "Em " + esc(fmtDT.format(new Date(c.drawnAt))) + ". " : ""}Cada pessoa abre o próprio link e vê só quem tirou. Nem você vê os pares.</p></div>
+      <p class="muted" style="margin-top:8px">${c.drawnAt ? "Em " + esc(fmtDT.format(new Date(c.drawnAt))) + ". " : ""}Cada pessoa abre o próprio link e vê só quem tirou. Nem você vê os pares.</p>
+      <p class="muted" style="margin-top:8px">Para avisar quem tem dificuldade, toque em ${ICON.link} ao lado do nome em Participantes e mande pelo WhatsApp.</p></div>
       ${warn}
       <div class="btn-row"><button class="btn btn-glass" type="button" data-act="redraw">Refazer sorteio</button><button class="btn btn-glass" type="button" data-act="reopen">Reabrir inscrições</button></div>
     </div>`;
@@ -480,7 +497,7 @@ function admPeopleHTML() {
     <div style="min-width:0"><div class="nm">${esc(str(p.name, 40))}${p.id === myId ? '<span class="tag me">Você</span>' : ""}${p.manual ? '<span class="tag">Cadastrado por você</span>' : ""}</div>
     <div class="sub">${esc(sizesLine(p) || "Sem tamanhos")}</div></div>
     <div class="acts">
-      <button class="icon-btn" type="button" data-act="new-link" data-v="${esc(p.id)}" aria-label="Gerar novo link para ${esc(p.name)}">${ICON.link}</button>
+      <button class="icon-btn" type="button" data-act="show-link" data-v="${esc(p.id)}" aria-label="Link pessoal de ${esc(p.name)}">${ICON.link}</button>
       <button class="icon-btn" type="button" data-act="edit-person" data-v="${esc(p.id)}" aria-label="Editar ${esc(p.name)}">${ICON.edit}</button>
       <button class="icon-btn danger" type="button" data-act="del-person" data-v="${esc(p.id)}" aria-label="Remover ${esc(p.name)}">${ICON.trash}</button>
     </div>
@@ -489,7 +506,7 @@ function admPeopleHTML() {
     ? '<div class="btn-row" style="margin-top:14px"><button class="btn btn-glass btn-sm" type="button" data-act="demo-seed">Adicionar 4 pessoas de exemplo</button><button class="btn btn-text btn-sm" type="button" data-act="demo-reset">Apagar demonstração</button></div>'
     : "";
   return `<div class="glass card">
-    <div class="card-head"><div><h2 class="card-title">Participantes</h2><p class="faint" style="margin-top:6px">Cadastre quem tem dificuldade e mande o link pessoal pelo WhatsApp.</p></div>
+    <div class="card-head"><div><h2 class="card-title">Participantes</h2><p class="faint" style="margin-top:6px">Cadastre quem tem dificuldade e toque em ${ICON.link} para mandar o link de cada pessoa pelo WhatsApp. Quem abre o link depois do sorteio já vê quem tirou.</p></div>
     <button class="btn btn-glass btn-sm" type="button" data-act="add-person">${ICON.plus} Cadastrar</button></div>
     <div class="list">${rows || '<p class="muted">Ninguém cadastrado ainda.</p>'}</div>${demo}
   </div>`;
@@ -593,13 +610,13 @@ async function leave() {
   refresh();
 }
 
-function showLinkSheet(token, name, { forSelf }) {
+function showLinkSheet(token, name, { forSelf, resetId = null }) {
   openSheet((body) => {
     body.innerHTML = `<div class="sheet-head"><h2 class="card-title">${forSelf ? "Pronto, você está no sorteio" : `Link de ${esc(first(name))}`}</h2><button class="icon-btn" type="button" data-act="close-sheet" aria-label="Fechar">${ICON.x}</button></div>
       <p class="muted">${forSelf
         ? "Este celular já fica conectado. Guarde o link abaixo para abrir em outro aparelho."
-        : `Mande este link só para ${esc(first(name))}. É por ele que ${esc(first(name))} edita o cadastro e, no dia, vê quem tirou.`}</p>
-      ${linkBoxHTML(token, name, forSelf ? {} : { title: "Link pessoal", text: "Quem tiver este link entra como essa pessoa." })}
+        : `Mande este link só para ${esc(first(name))}. ${S.config.status === "drawn" ? `Ao abrir, ${esc(first(name))} já vê quem tirou e as ideias de presente.` : `É por ele que ${esc(first(name))} edita o cadastro e, no dia, vê quem tirou.`}`}</p>
+      ${linkBoxHTML(token, name, forSelf ? {} : { title: "Link pessoal", text: "Não abra neste celular: ele passaria a entrar como essa pessoa.", resetId })}
       <button class="btn btn-gold btn-block" type="button" data-act="close-sheet">Fechar</button>`;
   });
 }
@@ -614,7 +631,7 @@ function openPersonSheet(id) {
       submitLabel: p ? "Salvar" : "Cadastrar",
       onSave: async (d) => {
         if (p) { await api.admin.updateParticipant(p.id, d); toast("Salvo"); closeSheet(); }
-        else { const r = await api.admin.createParticipant(d); closeSheet(); setTimeout(() => showLinkSheet(r.token, d.name, { forSelf: false }), 460); }
+        else { const r = await api.admin.createParticipant(d); closeSheet(); setTimeout(() => showLinkSheet(r.token, d.name, { forSelf: false, resetId: r.participant && r.participant.id }), 460); }
         refresh();
       },
     });
@@ -622,11 +639,19 @@ function openPersonSheet(id) {
   });
 }
 
+function showLink(id) {
+  const p = S.adminPeople.find((x) => x.id === id); if (!p) return;
+  if (p.token) showLinkSheet(p.token, p.name, { forSelf: false, resetId: p.id });
+  else newLink(id);
+}
+
 async function newLink(id) {
   const p = S.adminPeople.find((x) => x.id === id); if (!p) return;
   if (!(await ask({ title: `Novo link para ${first(p.name)}?`, body: "O link antigo para de funcionar. Use quando a pessoa perdeu o link ou trocou de celular.", ok: "Gerar link" }))) return;
-  try { const r = await api.admin.resetLink(id); showLinkSheet(r.token, p.name, { forSelf: false }); }
+  closeSheet();
+  try { const r = await api.admin.resetLink(id); setTimeout(() => showLinkSheet(r.token, p.name, { forSelf: false, resetId: p.id }), 460); }
   catch (e) { toast(errorCopy(e)); }
+  refresh();
 }
 
 /* ================= eventos ================= */
@@ -644,6 +669,7 @@ document.addEventListener("click", async (e) => {
     case "add-person": openPersonSheet(null); break;
     case "edit-person": openPersonSheet(v); break;
     case "del-person": delPerson(v); break;
+    case "show-link": showLink(v); break;
     case "new-link": newLink(v); break;
     case "copy-link": copyText(personalLink(v)); break;
     case "leave": leave(); break;
@@ -760,7 +786,7 @@ function consumeHash() {
   const m = location.hash.match(/^#(t|admin)=(.+)$/);
   if (!m) return;
   const val = decodeURIComponent(m[2]).trim();
-  if (m[1] === "t") setToken(val); else setAdminKey(val);
+  if (m[1] === "t") { setToken(val); S.autoOpen = true; S.revealed = false; } else setAdminKey(val);
   history.replaceState(null, "", location.pathname + location.search);
 }
 

@@ -124,7 +124,7 @@ export function createMockApi() {
       async listParticipants() {
         await wait(); requireAdmin();
         const st = load();
-        return Object.values(st.participants).map((p) => ({ ...toFull(p), complete: complete(p), inDraw: st.drawIds.includes(p.id) }));
+        return Object.values(st.participants).map((p) => ({ ...toFull(p), complete: complete(p), inDraw: st.drawIds.includes(p.id), token: p.token }));
       },
       async createParticipant(data) {
         await wait(); requireAdmin();

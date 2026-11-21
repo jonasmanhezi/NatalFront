@@ -19,7 +19,7 @@ Guia para quem for escrever o backend. O contrato formal está em [`openapi.yaml
 
 Recomendações:
 - Gere tokens com pelo menos 128 bits aleatórios (ex.: 32 caracteres base36 de `SecureRandom`).
-- Guarde só o **hash** do token (SHA-256) no banco. Na busca, faça o hash do que chegou.
+- Busque pelo **hash** do token (SHA-256). Guarde também o token em texto para o organizador poder reenviar o link de cada pessoa (veja abaixo).
 - Compare a chave de organizador em tempo constante.
 - Aplique limite de requisições em `POST /participants` e nas rotas `/admin/*`.
 
@@ -37,7 +37,7 @@ Recomendações:
 | POST | `/me/ideas` | token | Opcional: ideias com IA (`features.aiIdeas`) |
 | GET | `/admin/check` | chave | Confere a chave |
 | PUT | `/admin/config` | chave | Atualiza nome, `drawDate`, `exchangeDate`, `budget` |
-| GET | `/admin/participants` | chave | Cadastros completos + `complete` + `inDraw` |
+| GET | `/admin/participants` | chave | Cadastros completos + `complete` + `inDraw` + `token` (link pessoal) |
 | POST | `/admin/participants` | chave | Cadastra alguém (`manual = true`) → `{participant, token}` |
 | PUT | `/admin/participants/{id}` | chave | Edita um cadastro |
 | DELETE | `/admin/participants/{id}` | chave | Remove um cadastro |
@@ -64,7 +64,11 @@ O frontend chama tudo relativo a `apiBaseUrl` (em `js/config.js`), por exemplo `
 **Quem vê o quê**
 - Público: nome, foto e se o cadastro está completo.
 - Participante: o próprio cadastro e o cadastro completo de quem tirou.
-- Organizador: todos os cadastros e o estado do sorteio, **nunca os pares**. (Ele consegue gerar um link novo para alguém e abrir; isso é aceitável numa família e fica registrado como troca de token.)
+- Organizador: todos os cadastros, o estado do sorteio e o link pessoal de cada um (para mandar pelo WhatsApp), **nunca os pares**. Ele conseguiria abrir o link de alguém e ver o par dessa pessoa; isso é aceitável numa família.
+
+**Link pessoal (deep link)**
+- `https://site/#t=<token>`. Quem abre esse link depois do sorteio já vê quem tirou e as ideias de presente, sem tocar em nada (pensado para quem tem dificuldade com o celular).
+- O organizador copia ou manda pelo WhatsApp a qualquer momento, sem invalidar o link. "Trocar link" gera outro e o anterior para de funcionar.
 
 **Validação**
 - `name` obrigatório, até 40 caracteres. Tamanhos até 16. `likes` 300, `wishlist` 500, `avoid` 160.
@@ -82,7 +86,7 @@ Se o site e a API ficarem em domínios diferentes, libere a origem do site para 
 ```
 config        (id=1, title, draw_date, exchange_date, budget, status, drawn_at)
 participant   (id, name, photo, shoe, pants, shirt, likes, wishlist, avoid,
-               manual, token_hash, created_at, updated_at)
+               manual, token_hash, token, created_at, updated_at)
 assignment    (giver_id PK, receiver_id)   -- apagada e regravada a cada sorteio
 draw_member   (participant_id PK)          -- quem entrou no último sorteio
 ```
