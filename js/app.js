@@ -48,7 +48,8 @@ function daysUntil(v) { const d = parseDate(v); if (!d) return null; const t = n
 function setHTML(el, html) { if (el && el._h !== html) { el.innerHTML = html; el._h = html; } }
 function splitList(v) { return str(v, 600).split(/\n|;|,(?!\d)/).map((x) => x.trim()).filter(Boolean).slice(0, 10); }
 function complete(p) { return !!(p && (p.complete || (p.name && p.shoe && p.pants && p.shirt))); }
-function sizesLine(p) { return [["Calçado", p.shoe], ["Calça", p.pants], ["Camisa", p.shirt]].filter((x) => x[1]).map((x) => `${x[0]} ${str(x[1], 16)}`).join(" · "); }
+function orList(v) { const a = str(v, 16).split("/").map((x) => x.trim()).filter(Boolean); return a.length > 1 ? `${a.slice(0, -1).join(", ")} ou ${a[a.length - 1]}` : a.join(""); }
+function sizesLine(p) { return [["Calçado", p.shoe], ["Calça", p.pants], ["Camisa", p.shirt]].filter((x) => x[1]).map((x) => `${x[0]} ${orList(x[1])}`).join(" · "); }
 const byName = (a, b) => str(a.name, 40).localeCompare(str(b.name, 40), "pt-BR");
 function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* navegador sem armazenamento */ } }
 function read(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -137,12 +138,16 @@ function autoOpenGift() {
 }
 
 /* ================= formulário de pessoa ================= */
+// Tamanhos aceitam mais de uma opção ("36/38": chinelo 36, tênis 38). Salvo como texto separado por "/".
+const SIZE_MAX = 16;
+function splitSizes(v) { return str(v, SIZE_MAX).split(/\s*(?:\/|,|;|\bou\b)\s*/i).map((x) => x.trim()).filter(Boolean); }
+
 function sizeRow(prefix, key, label, groups, otherPh) {
   const chips = groups.map((g, gi) => (gi ? '<span class="chip-sep" aria-hidden="true"></span>' : "") +
-    g.map((v) => `<button type="button" class="chip" role="radio" aria-checked="false" data-k="${key}" data-v="${v}">${v}</button>`).join("")).join("");
+    g.map((v) => `<button type="button" class="chip" role="checkbox" aria-checked="false" data-k="${key}" data-v="${v}">${v}</button>`).join("")).join("");
   return `<div>
-    <div class="field-label" id="${prefix}-${key}-lbl">${label}</div>
-    <div class="chips" role="radiogroup" aria-labelledby="${prefix}-${key}-lbl">${chips}<button type="button" class="chip" role="radio" aria-checked="false" data-k="${key}" data-v="__other">Outro</button></div>
+    <div class="field-label" id="${prefix}-${key}-lbl">${label} <span class="field-hint">pode marcar mais de um</span></div>
+    <div class="chips" role="group" aria-labelledby="${prefix}-${key}-lbl">${chips}<button type="button" class="chip" role="checkbox" aria-checked="false" data-k="${key}" data-v="__other">Outro</button></div>
     <input class="input other-input" id="${prefix}-${key}-other" maxlength="16" placeholder="${otherPh}" hidden aria-label="${label}: outro tamanho">
   </div>`;
 }
@@ -174,8 +179,9 @@ function buildForm(root, prefix, { submitLabel, onSave }) {
   const form = root.querySelector("form");
   const F = (id) => root.querySelector(`#${prefix}-${id}`);
   let photo = null, dirty = false;
-  const sizes = { shoe: "", pants: "", shirt: "" };
   const opts = { shoe: SHOES, pants: [...PANTS_N, ...PANTS_L], shirt: SHIRTS };
+  const picked = { shoe: new Set(), pants: new Set(), shirt: new Set() };
+  const otherOn = { shoe: false, pants: false, shirt: false };
 
   function paintPhoto() {
     const b = F("photo-btn");
@@ -183,26 +189,47 @@ function buildForm(root, prefix, { submitLabel, onSave }) {
     b.classList.toggle("has", !!photo);
     F("photo-clear").hidden = !photo;
   }
-  function setSize(k, v) {
-    sizes[k] = v;
-    const isStd = opts[k].includes(v), other = F(`${k}-other`);
+  /** Opções marcadas na ordem da lista + o texto de "Outro", separados por "/". */
+  function sizeValue(k) {
+    const parts = opts[k].filter((v) => picked[k].has(v));
+    const other = otherOn[k] ? F(`${k}-other`).value.trim() : "";
+    if (other) parts.push(other);
+    return parts.join("/");
+  }
+  function paintSizes(k) {
     root.querySelectorAll(`.chip[data-k="${k}"]`).forEach((c) => {
-      const on = isStd ? c.dataset.v === v : (c.dataset.v === "__other" && (v !== "" || !other.hidden));
+      const on = c.dataset.v === "__other" ? otherOn[k] : picked[k].has(c.dataset.v);
       c.setAttribute("aria-checked", on ? "true" : "false");
     });
-    if (!isStd && v) { other.hidden = false; other.value = v; }
-    if (isStd) other.hidden = true;
+    F(`${k}-other`).hidden = !otherOn[k];
+  }
+  function setSizes(k, v) {
+    picked[k].clear(); otherOn[k] = false;
+    const rest = [];
+    for (const t of splitSizes(v)) {
+      const hit = opts[k].find((o) => o.toLowerCase() === t.toLowerCase());
+      if (hit) picked[k].add(hit); else rest.push(t);
+    }
+    const other = F(`${k}-other`); other.value = rest.join("/");
+    otherOn[k] = rest.length > 0;
+    paintSizes(k);
   }
   root.addEventListener("click", (e) => {
     const c = e.target.closest(".chip[data-k]"); if (!c) return;
     const k = c.dataset.k, v = c.dataset.v; dirty = true;
     if (v === "__other") {
-      const other = F(`${k}-other`); other.hidden = false; sizes[k] = other.value.trim();
-      root.querySelectorAll(`.chip[data-k="${k}"]`).forEach((x) => x.setAttribute("aria-checked", x === c ? "true" : "false"));
-      other.focus();
-    } else setSize(k, sizes[k] === v ? "" : v);
+      otherOn[k] = !otherOn[k]; paintSizes(k);
+      if (otherOn[k]) F(`${k}-other`).focus();
+      return;
+    }
+    if (picked[k].has(v)) picked[k].delete(v);
+    else {
+      picked[k].add(v);
+      if (sizeValue(k).length > SIZE_MAX) { picked[k].delete(v); toast("Não cabe mais um tamanho aqui. Desmarque algum para trocar."); }
+    }
+    paintSizes(k);
   });
-  ["shoe", "pants", "shirt"].forEach((k) => F(`${k}-other`).addEventListener("input", (e) => { sizes[k] = e.target.value.trim(); dirty = true; }));
+  ["shoe", "pants", "shirt"].forEach((k) => F(`${k}-other`).addEventListener("input", () => { dirty = true; }));
   form.addEventListener("input", () => { dirty = true; });
 
   const pick = () => F("photo").click();
@@ -220,6 +247,8 @@ function buildForm(root, prefix, { submitLabel, onSave }) {
     e.preventDefault();
     const st = F("status"), btn = F("save"), d = collect();
     if (!d.name) { st.className = "form-status err"; st.textContent = "Coloque o nome para continuar."; F("name").focus(); return; }
+    const long = [["shoe", "calçado"], ["pants", "calça"], ["shirt", "camisa"]].find(([k]) => sizeValue(k).length > SIZE_MAX);
+    if (long) { st.className = "form-status err"; st.textContent = `Os tamanhos de ${long[1]} ficaram longos demais. Desmarque algum.`; return; }
     btn.disabled = true; const lbl = btn.textContent; btn.textContent = "Salvando…"; st.className = "form-status"; st.textContent = "";
     try {
       await onSave(d);
@@ -232,7 +261,7 @@ function buildForm(root, prefix, { submitLabel, onSave }) {
   function collect() {
     return {
       name: F("name").value.trim().slice(0, 40), photo: photo || null,
-      shoe: str(sizes.shoe, 16), pants: str(sizes.pants, 16), shirt: str(sizes.shirt, 16),
+      shoe: sizeValue("shoe"), pants: sizeValue("pants"), shirt: sizeValue("shirt"),
       likes: F("likes").value.trim().slice(0, 300), wishlist: F("wish").value.trim().slice(0, 500), avoid: F("avoid").value.trim().slice(0, 160),
     };
   }
@@ -241,7 +270,7 @@ function buildForm(root, prefix, { submitLabel, onSave }) {
     F("name").value = str(p.name, 40); F("likes").value = str(p.likes, 300);
     F("wish").value = str(p.wishlist, 500); F("avoid").value = str(p.avoid, 160);
     photo = safePhoto(p.photo); paintPhoto();
-    ["shoe", "pants", "shirt"].forEach((k) => { F(`${k}-other`).hidden = true; F(`${k}-other`).value = ""; setSize(k, str(p[k], 16)); });
+    ["shoe", "pants", "shirt"].forEach((k) => setSizes(k, p[k]));
     dirty = false;
   }
   return { fill, isDirty: () => dirty };
@@ -372,7 +401,9 @@ function receiverHTML(p) {
       ${photo}
       <div class="eyebrow">Você tirou</div>
       <h2 class="rcv-name">${esc(str(p.name, 40))}</h2>
-      <div class="sizes">${sz.map(([l, v]) => { const t = str(v, 16); return `<div class="size inset ${t ? "" : "missing"}"><b class="${t.length > 3 ? "long" : ""}">${t ? esc(t) : "—"}</b><span>${l}</span></div>`; }).join("")}</div>
+      <div class="sizes">${sz.map(([l, v]) => { const t = str(v, 16), parts = t.split("/").map((x) => x.trim()).filter(Boolean);
+        const cls = parts.length > 2 || t.length > 7 ? "long xl" : t.length > 3 ? "long" : "";
+        return `<div class="size inset ${t ? "" : "missing"}"><b class="${cls}">${t ? parts.map(esc).join('<i class="or">ou</i>') : "—"}</b><span>${l}</span></div>`; }).join("")}</div>
     </div>
     ${p.likes ? `<div class="block"><h3 class="block-title">Gosta de</h3><p>${esc(str(p.likes, 300))}</p></div>` : ""}
     ${wish.length ? `<div class="block"><h3 class="block-title">Lista de desejos</h3><ul class="wish">${wish.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
@@ -745,22 +776,28 @@ function startSnow() {
   const c = $("#snow"), ctx = c.getContext("2d");
   let w = 0, h = 0, raf = 0;
   const flakes = [];
-  function size() { const dpr = Math.min(2, devicePixelRatio || 1); w = innerWidth; h = innerHeight; c.width = w * dpr; c.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  // Flocos são pontinhos borrados: resolução 1x basta e custa até 9x menos que a tela cheia em 3x.
+  function size() { w = innerWidth; h = innerHeight; c.width = w; c.height = h; }
   size(); addEventListener("resize", size);
-  const N = Math.round(Math.min(110, Math.max(40, (w * h) / 9000)));
+  const N = Math.round(Math.min(70, Math.max(30, (w * h) / 12000)));
   for (let i = 0; i < N; i++) flakes.push({ x: Math.random() * w, y: Math.random() * h, r: 0.6 + Math.random() * 2.1, s: 0.25 + Math.random() * 0.75, a: Math.random() * 6.28, o: 0.25 + Math.random() * 0.55 });
   function draw() {
     ctx.clearRect(0, 0, w, h); ctx.fillStyle = "#fff";
     for (const f of flakes) { ctx.globalAlpha = f.o; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill(); }
   }
   if (REDUCE) { draw(); return; }
-  function tick() {
+  let lastT = 0;
+  function tick(t) {
+    raf = requestAnimationFrame(tick);
+    // 30 quadros/s e parada com painel aberto: neve não precisa de 60/120 Hz.
+    if (S.sheetOpen || S.dlgDone || t - lastT < 32) return;
+    const k = lastT ? Math.min(3, (t - lastT) / 16.7) : 1; lastT = t;
     for (const f of flakes) {
-      f.y += f.s * (0.55 + f.r * 0.32); f.a += 0.012; f.x += Math.sin(f.a) * 0.35;
+      f.y += f.s * (0.55 + f.r * 0.32) * k; f.a += 0.012 * k; f.x += Math.sin(f.a) * 0.35 * k;
       if (f.y > h + 4) { f.y = -4; f.x = Math.random() * w; }
       if (f.x > w + 4) f.x = -4; else if (f.x < -4) f.x = w + 4;
     }
-    draw(); raf = requestAnimationFrame(tick);
+    draw();
   }
   raf = requestAnimationFrame(tick);
   document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden) raf = requestAnimationFrame(tick); });
@@ -771,8 +808,22 @@ function buildLights() {
   const path = document.createElementNS(ns, "path");
   path.setAttribute("d", "M-6 4 C 50 40, 120 42, 180 20 S 300 -2, 366 22"); path.setAttribute("class", "wire"); svg.appendChild(path);
   const L = path.getTotalLength(), cols = ["#f3c76a", "#e4475b", "#86dcaa", "#fff1cf"], N = 15;
+  // Brilho como gradiente parado (filtro drop-shadow animado repintava as luzes a cada quadro).
+  const defs = document.createElementNS(ns, "defs");
+  cols.forEach((c, i) => {
+    const g = document.createElementNS(ns, "radialGradient"); g.id = `glow${i}`;
+    [["0", 0.9], ["0.45", 0.35], ["1", 0]].forEach(([o, a]) => {
+      const st = document.createElementNS(ns, "stop"); st.setAttribute("offset", o); st.setAttribute("stop-color", c); st.setAttribute("stop-opacity", a); g.appendChild(st);
+    });
+    defs.appendChild(g);
+  });
+  svg.appendChild(defs);
   for (let i = 0; i < N; i++) {
     const pt = path.getPointAtLength((L * (i + 0.5)) / N);
+    const glow = document.createElementNS(ns, "circle");
+    glow.setAttribute("cx", pt.x.toFixed(1)); glow.setAttribute("cy", (pt.y + 5).toFixed(1)); glow.setAttribute("r", "11");
+    glow.setAttribute("fill", `url(#glow${i % 4})`); glow.setAttribute("class", "glow");
+    svg.appendChild(glow);
     const b = document.createElementNS(ns, "ellipse");
     b.setAttribute("cx", pt.x.toFixed(1)); b.setAttribute("cy", (pt.y + 5).toFixed(1)); b.setAttribute("rx", "3.2"); b.setAttribute("ry", "4.2");
     b.setAttribute("fill", cols[i % 4]); b.setAttribute("class", "bulb");

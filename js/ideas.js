@@ -20,18 +20,20 @@ const KW = [
 ];
 
 const s = (v, max) => (typeof v === "string" ? v : v == null ? "" : String(v)).slice(0, max);
+// "36/38" -> "36 ou 38"
+const or = (v) => { const p = s(v, 16).split("/").map((x) => x.trim()).filter(Boolean); return p.length > 1 ? `${p.slice(0, -1).join(", ")} ou ${p[p.length - 1]}` : p.join(""); };
 
 /** @returns {[string,string][]} pares [ideia, motivo] */
 export function staticIdeas(p) {
   const out = [];
-  if (p.shirt) out.push(["Camiseta, camisa ou moletom", `Tamanho ${s(p.shirt, 16)}`]);
-  if (p.pants) out.push(["Calça, bermuda ou pijama", `Tamanho ${s(p.pants, 16)}`]);
-  if (p.shoe) out.push(["Chinelo, pantufa ou tênis", `Número ${s(p.shoe, 16)}`]);
+  if (p.shirt) out.push(["Camiseta, camisa ou moletom", `Tamanho ${or(p.shirt)}`]);
+  if (p.pants) out.push(["Calça, bermuda ou pijama", `Tamanho ${or(p.pants)}`]);
+  if (p.shoe) out.push(["Chinelo, pantufa ou tênis", `Número ${or(p.shoe)}`]);
   const likes = s(p.likes, 300), avoid = s(p.avoid, 160);
   for (const [re, idea] of KW) {
     if (out.length >= 6) break;
     if (re.test(likes) && !re.test(avoid)) out.push([idea, "Combina com o que gosta"]);
   }
-  if (out.length < 4) out.push(["Pantufa ou meias de Natal", p.shoe ? `Número ${s(p.shoe, 16)}` : "Sempre funciona"]);
+  if (out.length < 4) out.push(["Pantufa ou meias de Natal", p.shoe ? `Número ${or(p.shoe)}` : "Sempre funciona"]);
   return out.slice(0, 6);
 }
