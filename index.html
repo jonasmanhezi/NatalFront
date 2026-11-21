@@ -21,6 +21,7 @@
 <main class="app" id="app">
   <header class="hero">
     <svg class="lights" id="lights" viewBox="0 0 360 46" aria-hidden="true"></svg>
+    <div class="hero-art" data-art="SANTA"></div>
     <div class="eyebrow" id="heroEyebrow">Natal 2026</div>
     <h1>Amigo <em>Secreto</em></h1>
     <p class="lede" id="heroLede">Cadastre sua foto e seus tamanhos. No dia do sorteio, você descobre aqui quem tirou.</p>
@@ -35,10 +36,13 @@
   </section>
 
   <section class="view" data-view="cadastro" id="view-cadastro">
-    <div>
+    <div class="sec-head">
+      <div>
       <div class="eyebrow">Seus dados</div>
       <h2 class="sec-title" id="cadTitle">Entrar no sorteio</h2>
       <p class="sec-sub">É isso que o seu amigo secreto vai ver.</p>
+      </div>
+      <div class="sec-art" data-art="SANTA_LIST"></div>
     </div>
     <div id="cadMsg"></div>
     <div class="glass card" id="myFormWrap"></div>
@@ -47,9 +51,12 @@
   </section>
 
   <section class="view" data-view="pessoas" id="view-pessoas">
-    <div>
-      <div class="eyebrow" id="pplCount">No sorteio</div>
-      <h2 class="sec-title">Quem vai participar</h2>
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow" id="pplCount">No sorteio</div>
+        <h2 class="sec-title">Quem vai participar</h2>
+      </div>
+      <div class="sec-art" data-art="GRUMPY"></div>
     </div>
     <div id="pplGrid"></div>
   </section>

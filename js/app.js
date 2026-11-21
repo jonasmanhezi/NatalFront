@@ -1,6 +1,7 @@
 import { createApi } from "./api/index.js";
 import { staticIdeas } from "./ideas.js";
 import { ICON, BOW } from "./icons.js";
+import * as ART from "./characters.js";
 
 /* ================= constantes ================= */
 const DEF = { title: "Natal 2026", drawDate: "", exchangeDate: "2026-12-24", budget: null, status: "open", drawnAt: null, drawCount: 0, features: { aiIdeas: false } };
@@ -368,6 +369,7 @@ function giftHTML() {
       <span class="gift-title">Seu amigo secreto<br>está aqui dentro</span>
       <span class="gift-sub">Toque no presente para abrir. Veja se ninguém está espiando.</span>
     </button>
+    <span class="peek-wrap">${ART.GRUMPY_PEEK}</span>
   </div>`;
 }
 
@@ -411,24 +413,25 @@ function receiverHTML(p) {
     ${ideasHTML(p)}`;
 }
 
-function noteCard(title, text, extra = "") {
-  return `<div class="glass card stack-col"><div>${title ? `<h2 class="card-title">${esc(title)}</h2>` : ""}<p class="muted" style="margin-top:${title ? 8 : 0}px">${esc(text)}</p></div>${extra}</div>`;
+function noteCard(title, text, extra = "", art = "") {
+  const body = `<div>${title ? `<h2 class="card-title">${esc(title)}</h2>` : ""}<p class="muted" style="margin-top:${title ? 8 : 0}px">${esc(text)}</p></div>`;
+  return `<div class="glass card stack-col">${art ? `<div class="note-row"><span class="note-art">${art}</span>${body}</div>` : body}${extra}</div>`;
 }
 
 function mineHTML() {
   if (S.loading) return "";
-  if (S.offline && !S.people.length) return noteCard("Sem conexão", "Não consegui falar com o servidor. Confira a internet; a página tenta de novo sozinha.");
+  if (S.offline && !S.people.length) return noteCard("Sem conexão", "Não consegui falar com o servidor. Confira a internet; a página tenta de novo sozinha.", "", ART.GRUMPY);
   const c = S.config, me = S.me;
   if (c.status === "drawn") {
     const r = myReceiver();
     if (r) return S.revealed
       ? `<div class="glass card reveal">${receiverHTML(r)}<button class="btn btn-glass btn-block" type="button" data-act="hide-gift">${ICON.eyeOff} Esconder</button></div>`
       : giftHTML();
-    if (r === null) return noteCard("Ops, a corrente quebrou", "A pessoa que você tirou saiu da lista. Peça ao organizador para refazer o sorteio.");
-    if (me) return noteCard("Você entrou depois do sorteio", "Seu cadastro está salvo, mas o sorteio já tinha sido feito. Peça ao organizador para refazer.");
+    if (r === null) return noteCard("Ops, a corrente quebrou", "A pessoa que você tirou saiu da lista. Peça ao organizador para refazer o sorteio.", "", ART.GRUMPY);
+    if (me) return noteCard("Você entrou depois do sorteio", "Seu cadastro está salvo, mas o sorteio já tinha sido feito. Peça ao organizador para refazer.", "", ART.GRUMPY);
     return noteCard("O sorteio já foi feito", S.tokenInvalid
       ? "Seu link não vale mais. Peça um novo ao organizador."
-      : "Para ver quem você tirou, abra o link pessoal que você recebeu. Se você ficou de fora, fale com o organizador.");
+      : "Para ver quem você tirou, abra o link pessoal que você recebeu. Se você ficou de fora, fale com o organizador.", "", ART.GRUMPY);
   }
   if (me) {
     return `<div class="glass card stack-col">
@@ -476,7 +479,7 @@ function renderCadastro() {
   const me = S.me, drawn = S.config.status === "drawn";
   $("#cadTitle").textContent = me ? "Seu cadastro" : "Entrar no sorteio";
   const closed = drawn && !me;
-  setHTML($("#cadMsg"), closed ? noteCard("", "O sorteio já foi feito, então as inscrições estão fechadas. Fale com o organizador se você ficou de fora.") : "");
+  setHTML($("#cadMsg"), closed ? noteCard("", "O sorteio já foi feito, então as inscrições estão fechadas. Fale com o organizador se você ficou de fora.", "", ART.GRUMPY) : "");
   $("#myFormWrap").hidden = closed || S.loading;
   setHTML($("#cadLink"), me && S.token ? linkBoxHTML(S.token, me.name) : "");
   $("#cadLeave").hidden = !(me && !drawn);
@@ -487,7 +490,7 @@ function renderPeople() {
   $("#pplCount").textContent = `${n} ${n === 1 ? "pessoa" : "pessoas"} no sorteio`;
   if (!n) {
     setHTML($("#pplGrid"), noteCard("Ninguém ainda", S.loading ? "Carregando…" : "Seja a primeira pessoa a se cadastrar.",
-      '<button class="btn btn-gold btn-block" type="button" data-act="go" data-v="cadastro">Fazer meu cadastro</button>'));
+      '<button class="btn btn-gold btn-block" type="button" data-act="go" data-v="cadastro">Fazer meu cadastro</button>', ART.SANTA));
     return;
   }
   const myId = S.me && S.me.id;
@@ -843,6 +846,7 @@ function consumeHash() {
 }
 
 function boot() {
+  document.querySelectorAll("[data-art]").forEach((el) => { el.innerHTML = ART[el.dataset.art] || ""; el.setAttribute("aria-hidden", "true"); });
   buildLights(); startSnow();
   setToken(read(K_TOKEN)); setAdminKey(read(K_ADMIN));
   consumeHash();

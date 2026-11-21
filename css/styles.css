@@ -303,5 +303,28 @@ a.btn-glass{color:var(--ink)}
 .demo-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;background:var(--gold-soft);border-color:#f3dca8}
 .demo-bar p{font-size:14px;color:#6b4a00;flex:1 1 220px;font-weight:600}
 
+/* ---------- personagens ---------- */
+.char{display:block;width:100%;height:auto;overflow:visible}
+.hero{position:relative}
+.hero-art{position:absolute;right:-8px;top:34px;width:112px;pointer-events:none}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
+.sec-head>div:first-child{min-width:0}
+.sec-art{flex:0 0 92px;margin:0 -6px -8px 0}
+.note-row{display:grid;grid-template-columns:76px 1fr;gap:14px;align-items:center}
+.note-art{display:block}
+/* Papai Noel acena de vez em quando */
+.santa .wave{transform-box:view-box;transform-origin:100px 114px;animation:wave 4.5s ease-in-out infinite}
+@keyframes wave{0%,52%,100%{transform:rotate(0)}60%{transform:rotate(-12deg)}68%{transform:rotate(9deg)}76%{transform:rotate(-9deg)}84%{transform:rotate(4deg)}}
+/* o ranzinza franze a testa */
+.grumpy .brows{animation:frown 5s ease-in-out infinite}
+@keyframes frown{0%,70%,100%{transform:none}76%,88%{transform:translateY(3px)}}
+/* e espia o presente pela beirada */
+.gift{position:relative;padding-bottom:64px}
+.peek-wrap{position:absolute;right:18px;bottom:0;width:96px;pointer-events:none;overflow:hidden;height:62px}
+.peek-wrap .peek{animation:peek 9s ease-in-out infinite;transform:translateY(100%)}
+@keyframes peek{0%,30%{transform:translateY(100%)}38%,78%{transform:translateY(0)}86%,100%{transform:translateY(100%)}}
+.peek .pupil{animation:look 9s ease-in-out infinite}
+@keyframes look{0%,46%{transform:none}52%,62%{transform:translateX(6px)}68%,100%{transform:none}}
+
 @media (max-width:380px){.row2{grid-template-columns:1fr}.rcv-name{font-size:40px}.big{font-size:56px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
